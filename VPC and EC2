@@ -1,0 +1,88 @@
+Resources:
+ # Creating VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value:  "MyVPC"
+
+#Creating Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: VPC
+
+#Attaching Internet Gateway to the VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+#Creating Public Subnet
+  MySubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1a"
+      VpcId: !Ref VPC
+      CidrBlock: "10.10.10.0/24"
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"  
+
+#Creating Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "Public"
+
+#Creating Route in the route table and attaching Internet Gateway to it
+  PublicRoute1:   
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway     
+
+
+#Attaching Route table to our Public subnet
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet
+      RouteTableId: !Ref PublicRouteTable
+
+#Creating Security Group for our EC2 Instance. Only SSH will be allowed.
+  MySecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+            - IpProtocol: 'tcp'
+              FromPort: '22'
+              ToPort: '22'
+              CidrIp: '0.0.0.0/0'       
+     
+  #Now launch an EC2 Instance to our newly created VPC    
+  MyEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-03b5297d565ef30a6
+        InstanceType: 't2.micro'
+        SecurityGroupIds:
+          - !GetAtt "MySecGroup.GroupId"
+        KeyName: mumbai
+        SubnetId: !Ref MySubnet
+
+        
+
+
