@@ -1,0 +1,161 @@
+###Sunday March 29 12:18:32 IST 2020
+##purpose ## AWS Cloud formation Template to ceate classic Load balancer. With VPC and EC2 instances. ##
+##Created by Nikhil Kulkarni ###
+
+#########################################################################
+
+
+Resources:
+ 
+ # Creating VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value:  "MyVPC"
+
+
+#Creating Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: VPC
+
+
+#Attaching Internet Gateway to the VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+
+#Creating Public Subnet
+  MySubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1a"
+      VpcId: !Ref VPC
+      CidrBlock: "10.10.10.0/24"
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"    
+
+
+#Creating Public Subnet
+  MySubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1b"
+      VpcId: !Ref VPC
+      CidrBlock: "10.10.20.0/24"
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"  
+
+
+#Creating Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "Public"
+
+
+#Creating Route in the route table and attaching Internet Gateway to it
+  PublicRoute1:   
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway     
+
+
+#Attaching Route table to our Public subnet1
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+
+#Attaching Route table to our Public subnet2
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+      
+#Creating Security Group for our EC2 Instance and the Classic load balancer. 
+  MySecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+            - IpProtocol: 'tcp'
+              FromPort: '22'
+              ToPort: '22'
+              CidrIp: '0.0.0.0/0'
+            - IpProtocol: 'tcp'
+              FromPort: '80'
+              ToPort: '80'
+              CidrIp: '0.0.0.0/0'       
+  
+#Now we will create Two EC2 instnaces. One for each AZ.
+  Instance1:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-03b5297d565ef30a6
+        InstanceType: 't2.micro'
+        SecurityGroupIds: 
+          - !GetAtt "MySecGroup.GroupId"
+        KeyName: mumbai
+        SubnetId: !Ref "MySubnet1"
+
+
+  Instance2:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-03b5297d565ef30a6
+        InstanceType: 't2.micro'
+        SecurityGroupIds: 
+          - !GetAtt "MySecGroup.GroupId"
+        KeyName: mumbai
+        SubnetId: !Ref "MySubnet2"
+
+
+#Final Step. Will create the classic load balancer. Will attach both the instaces to it.
+  MyCLB:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Subnets:
+        - !Ref MySubnet1
+        - !Ref MySubnet2
+      Instances:
+        - !Ref Instance1
+        - !Ref Instance2
+      Listeners:
+        - LoadBalancerPort: '80'
+          InstancePort: '80'
+          Protocol: HTTP
+      HealthCheck:
+          Target: HTTP:80/
+          HealthyThreshold: '2'
+          UnhealthyThreshold: '3'
+          Interval: '5'
+          Timeout: '2'
+      SecurityGroups: 
+         - !GetAtt "MySecGroup.GroupId"
+      CrossZone: 'true'
+
+
