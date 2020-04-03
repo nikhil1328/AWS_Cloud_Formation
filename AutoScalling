@@ -1,3 +1,10 @@
+### Thursday April 2 16:50:32 IST 2020
+## Purpose ## AWS Cloud formation Template to launch AWS AutoScalling service to scale up and dows ec2 instances. ##
+##Created by Nikhil Kulkarni ###
+
+#########################################################################
+
+
 Resources:
  
  # Creating VPC
