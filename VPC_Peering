@@ -1,0 +1,203 @@
+### Tuesday April 7 19:01:32 IST 2020
+##Purpose ## AWS Cloud formation Template to ceate VPC Peering. ##
+##Created by Nikhil Kulkarni ###
+
+
+###################################################################################################################
+
+
+
+Resources:
+ 
+ # Creating VPC1 and VPC2
+
+  VPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value:  "MyVPC_1"
+
+
+  VPC2:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.20.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value:  "MyVPC_2"
+
+# Lets create VPC peering connection.
+  VPCPeeringConnection:
+    Type: 'AWS::EC2::VPCPeeringConnection'
+    Properties:
+      VpcId: !Ref VPC1
+      PeerVpcId: !Ref VPC2
+
+
+#Creating Internet Gateway. Only for VPC1. VPC2 will contain only private subnet.
+  InternetGateway1:
+    Type: AWS::EC2::InternetGateway
+  #  DependsOn: VPC_1
+
+
+#Attaching Internet Gateway to the VPC1.
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC1
+      InternetGatewayId: !Ref InternetGateway1
+
+
+  #Creating Public Subnet. (Inside VPC1)
+  PublicSub:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1a"
+      VpcId: !Ref VPC1
+      CidrBlock: "10.10.1.0/24"
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"    
+
+
+#Creating Private Subnet. (inside VPC2)
+  PrivateSub:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1b"
+      VpcId: !Ref VPC2
+      CidrBlock: "10.20.2.0/24"
+      MapPublicIpOnLaunch: 'false'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"  
+
+
+#Creating Route Table. For Public Subnet. (VPC1)
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC1
+      Tags:
+      - Key: Name
+        Value: "Public"
+
+
+#Creating Route Table. For Private Subnet. (VPC2)
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC2
+      Tags:
+      - Key: Name
+        Value: "Private"
+
+
+#Creating Route in the route table and attaching Internet Gateway to it. (For Public Subnet)
+  PublicRoute:   
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway1
+
+
+#Update Route table with Peering connection deatils for Public Subnet.
+  PublicRoutePeering:   
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '10.20.2.0/24'
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection
+
+
+#Update Route table with Peering connection deatils for Private Subnet.
+  PrivateRoute:   
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: '10.10.1.0/24'
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection
+    
+
+
+#Attaching Route table to our Public subnet1
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSub
+      RouteTableId: !Ref PublicRouteTable
+
+
+#Attaching Route table to our Public subnet2
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSub
+      RouteTableId: !Ref PrivateRouteTable
+
+      
+#Creating Security Group for our EC2 Instances. (for VPC1)
+  MySecGroup1:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId: !Ref VPC1
+        SecurityGroupIngress:
+            - IpProtocol: 'tcp'
+              FromPort: '22'
+              ToPort: '22'
+              CidrIp: '0.0.0.0/0'
+            
+
+
+#Creating Security Group for our EC2 Instances. (for VPC2)
+  MySecGroup2:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId: !Ref VPC2
+        SecurityGroupIngress:
+            - IpProtocol: 'tcp'
+              FromPort: '22'
+              ToPort: '22'
+              CidrIp: '0.0.0.0/0'    
+
+
+#Now we will create Two EC2 instnaces. (inside the Public Subnet)
+  Instance1:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-03b5297d565ef30a6
+        InstanceType: 't2.micro'
+        SecurityGroupIds: 
+          - !GetAtt "MySecGroup1.GroupId"
+        KeyName: MyKeyFile
+        SubnetId: !Ref PublicSub
+
+#Create one more ec2 instnace but in private subnet.
+  Instance2:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-03b5297d565ef30a6
+        InstanceType: 't2.micro'
+        SecurityGroupIds: 
+          - !GetAtt "MySecGroup2.GroupId"
+        KeyName: MyKeyFile
+        SubnetId: !Ref PrivateSub
+
+
+## after sucessful copletion Login to EC2 instace wich is associated with the public subnet.
+## Copy the key file on the instance. Change its permissions. Set is to 400.
+## now login to the Private instnace using its Private IP.
+
