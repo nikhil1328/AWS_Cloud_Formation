@@ -1,0 +1,165 @@
+### Tuesday May 19  22:53 IST 2020
+## Purpose ## AWS Cloud formation Template to launch AWS RDS (Postgresql). ##
+##Created by Nikhil Kulkarni ###
+
+#########################################################################
+
+
+Resources:
+ # Creating VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value:  "MyVPC"
+
+#Creating Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: VPC
+
+#Attaching Internet Gateway to the VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+#Creating Public Subnet
+  MySubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1a"
+      VpcId: !Ref VPC
+      CidrBlock: "10.10.10.0/24"
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"    
+
+#Creating Public Subnet
+  MySubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-south-1b"
+      VpcId: !Ref VPC
+      CidrBlock: "10.10.20.0/24"
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: "purpose"
+        Value: "CloudFormationTesting"    
+
+#Creating Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "Public"
+
+#Creating Route in the route table and attaching Internet Gateway to it
+  PublicRoute1:   
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway     
+
+#Attaching Route table to our Public subnet
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+#Creating Security Group for our EC2 Instance. Only SSH will be allowed.
+  MySecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+            - IpProtocol: 'tcp'
+              FromPort: '22'
+              ToPort: '22'
+              CidrIp: '0.0.0.0/0'
+  
+
+#Creating Security Group for our RDS Instance. Only 5432 port will be opened.
+  MyDBSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Enable DB access via port 5432
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+            - IpProtocol: 'tcp'
+              FromPort: '5432'
+              ToPort: '5432'
+              CidrIp: '0.0.0.0/0'
+
+#Now launch an EC2 Instance to our newly created VPC    
+  MyEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-03b5297d565ef30a6
+        InstanceType: 't2.micro'
+        SecurityGroupIds:
+          - !GetAtt "MySecGroup.GroupId"
+        KeyName: mumbai
+        SubnetId: !Ref MySubnet1
+
+# Create SubnetGroup for RDS instance.
+  DBSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: DB Subnets
+      SubnetIds:
+          - !Ref MySubnet1
+          - !Ref MySubnet2
+
+# Mention Database parameters. 
+  DBParamGroup:
+    Type: 'AWS::RDS::DBParameterGroup'
+    Properties:
+      Description: Database Parameter Group + pg_stat_statements
+      Family: 'postgres11'
+      Parameters:
+        shared_preload_libraries: pg_stat_statements
+
+# Launch DB Inbstance.
+
+  PGDB:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBName: testdb  # Mention your database name
+      DBInstanceIdentifier: 'MyDB' # Provide name to your database instance.
+      AllocatedStorage: '5'  # Provide size for your dabase. (in GB)
+      DBInstanceClass: db.t2.micro  # You database instance type.
+      Engine: postgres 
+      MasterUsername: 'postgres' # Provide Database user name
+      MasterUserPassword: 'pass123'   #Provide Password for your database
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBParameterGroupName: !Ref DBParamGroup
+      VPCSecurityGroups:
+          - !GetAtt "MyDBSecGroup.GroupId"
+  
+
+######################################################################################
+
+# 1: Once the Cloud formation completed, login to your EC2 instance. Install postgersql package. (#yum install postgresql).
+# 2: Now go to RDS in Managemnet console. Selcet the newly cerated Database. Note down the Endpoint.
+# 3: Loing to database using Endpoint.   #psql -h <Endpoint> -p 5432 -U  <Database user> 
+# eg.  #psql -h mydb.cbofcpfrapkv.ap-south-1.rds.amazonaws.com -p 5432 -U postgres 
+# 4: Enter the password. And access the database
