@@ -1,3 +1,8 @@
+### Tuesday March 31 22:50:32 IST 2020
+##purpose ## AWS Cloud formation Template to Create VPC and EC2 instance. ##
+##Created by Nikhil Kulkarni ###
+
+######################################################################### 
 Resources:
  # Creating VPC
   VPC:
