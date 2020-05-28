@@ -1,0 +1,36 @@
+### Wednesday May 20  22:27 IST 2020
+## Purpose ## AWS Cloud formation Template to create AWS S3 Bucket.. ##
+##Created by Nikhil Kulkarni ###
+
+#########################################################################
+
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html  # Default page to return the website.
+        ErrorDocument: error.html  # Default page to return errors while accessing website.
+    DeletionPolicy: Retain
+
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join 
+              - ''
+              -
+                - 'arn:aws:s3:::'
+                - !Ref S3Bucket
+                - "/*"
+      Bucket: !Ref S3Bucket
