@@ -1,9 +1,0 @@
- Resources:
-  MyEC2:
-    Type: AWS::EC2::Instance
-    Properties:
-        ImageId: ami-ID
-        InstanceType: 't2.micro'
-        SecurityGroupIds: ['sg-ID']
-        KeyName: Key-Pair
-        SubnetId: 'subnet-ID'

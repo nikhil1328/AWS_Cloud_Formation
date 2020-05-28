@@ -1,0 +1,15 @@
+  
+### Tuesday March 31 22:50:32 IST 2020
+##purpose ## AWS Cloud formation Template to EC2 instance. ##
+##Created by Nikhil Kulkarni ###
+
+######################################################################### 
+ Resources:
+  MyEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+        ImageId: ami-ID
+        InstanceType: 't2.micro'
+        SecurityGroupIds: ['sg-ID']
+        KeyName: Key-Pair  # Replace with your key file
+        SubnetId: 'subnet-ID'
