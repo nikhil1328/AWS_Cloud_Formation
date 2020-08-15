@@ -1,0 +1,63 @@
+### Friday August 14 22:50:32 IST 2020
+##purpose ## AWS Cloud formation Template to Create Customer Master Key (Symmetric). ##
+##Created by Nikhil Kulkarni ###
+
+######################################################################### 
+
+Resources:
+
+  MyKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: An example symmetric CMK
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+        - Sid: Enable IAM User Permissions
+          Effect: Allow
+          Principal:
+            AWS: 
+              - Ref: 'AWS::AccountId'
+          Action: kms:*
+          Resource: '*'
+        - Sid: Allow administration of the key
+          Effect: Allow
+          Principal:
+            AWS: 
+              - Ref: 'AWS::AccountId' 
+          Action:
+          - kms:Create*
+          - kms:Describe*
+          - kms:Enable*
+          - kms:List*
+          - kms:Put*
+          - kms:Update*
+          - kms:Revoke*
+          - kms:Disable*
+          - kms:Get*
+          - kms:Delete*
+          - kms:ScheduleKeyDeletion
+          - kms:CancelKeyDeletion
+          Resource: '*'
+        - Sid: Allow use of the key
+          Effect: Allow
+          Principal:
+            AWS: 
+              - Ref: 'AWS::AccountId'
+          Action:
+          - kms:DescribeKey
+          - kms:Encrypt
+          - kms:Decrypt
+          - kms:ReEncrypt*
+          - kms:GenerateDataKey
+          - kms:GenerateDataKeyWithoutPlaintext
+          Resource: '*'
+
+
+  MyEncryptionKey:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/exampleAlias
+      TargetKeyId:
+        Ref: MyKey  
